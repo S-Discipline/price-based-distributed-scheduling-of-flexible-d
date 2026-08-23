@@ -1,16 +1,17 @@
 {
   "seed": 260715570,
   "replicates": 16,
-  "community_sizes": [4, 8, 16, 32, 64, 128, 256],
+  "community_sizes": [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 175, 200],
   "horizon_intervals": 96,
   "interval_hours": 0.25,
   "charger_kw": 7.2,
   "max_duration_intervals": 24,
   "mean_duration_intervals": 20.0,
   "sd_duration_intervals": 4.0,
+  "synthetic_utilization_min": 0.85,
+  "synthetic_utilization_max": 1.0,
   "renewable_mean_kwh": 1.6,
   "renewable_lognormal_sigma": 0.7,
   "nem_import_price": 0.5,
   "nem_export_price": 0.2
 }
-

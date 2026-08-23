@@ -76,9 +76,12 @@ def make_instance(n: int, rng: np.random.Generator, cfg: dict):
             )), 4, max_duration))
             if t + duration > t_max:
                 continue
-            # Synthetic substitution for undisclosed ACN preprocessing: jobs use
-            # 35--85% of their feasible charging envelope.
-            utilization = rng.uniform(0.35, 0.85)
+            # Stress/control substitution for undisclosed ACN preprocessing:
+            # jobs use 85--100% of their feasible charging envelope.
+            utilization = rng.uniform(
+                cfg["synthetic_utilization_min"],
+                cfg["synthetic_utilization_max"],
+            )
             demand = float(cbar * duration * utilization)
             jobs.append(Job(i, t, t + duration - 1, demand))
             available = t + duration
@@ -310,7 +313,14 @@ def main():
     print(f"minimum_household_saving_vs_NEM={min_saving:.10f}")
     print(f"replicates_per_N={cfg['replicates']}")
     print(f"total_replicates={len(rows)}")
-    print("substitution=seeded synthetic EV demand; ACN preprocessing and paper point values unavailable")
+    print("substitution=seeded high-utilization synthetic EV demand; ACN preprocessing and paper point values unavailable")
+    print("summary_json=" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    print("diagnostics_json=" + json.dumps({
+        "minimum_coordinator_margin": min_margin,
+        "minimum_household_saving_vs_nem": min_saving,
+        "max_gap_per_household": max(r["gap_per_household"] for r in rows),
+        "nonzero_gap_replicates": sum(r["gap_per_household"] > 1e-10 for r in rows),
+    }, sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":
