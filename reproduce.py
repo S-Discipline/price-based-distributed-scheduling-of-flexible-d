@@ -311,6 +311,13 @@ def main():
     print(f"replicates_per_N={cfg['replicates']}")
     print(f"total_replicates={len(rows)}")
     print("substitution=seeded synthetic EV demand; ACN preprocessing and paper point values unavailable")
+    print("summary_json=" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    print("diagnostics_json=" + json.dumps({
+        "minimum_coordinator_margin": min_margin,
+        "minimum_household_saving_vs_nem": min_saving,
+        "max_gap_per_household": max(r["gap_per_household"] for r in rows),
+        "nonzero_gap_replicates": sum(r["gap_per_household"] > 1e-10 for r in rows),
+    }, sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":
