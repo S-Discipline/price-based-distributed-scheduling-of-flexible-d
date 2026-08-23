@@ -75,13 +75,13 @@ These diagnostics check realized simulated trajectories. They do not replace the
 
 | Claim | Paper result | Observed result | Assessment | Compute |
 |---|---|---|---|---:|
-| Figure 4: TPR approaches the oracle as N grows | Approximately exponential; visually ≈$0.4 at the smallest N and ≈$1.5×10⁻⁶ at N=200 | Baseline: ≤$2.9×10⁻¹⁵ mean at every N. High-utilization control: $0.1221 at N=5, $0.00373 at N=10, numerical zero from N=15 | **Partially aligned** — same direction, faster floor; quantitative rate unresolved | 21 s formal + 11 s telemetry + 16 s control |
+| Figure 4: TPR approaches the oracle as N grows | Approximately exponential; visually ≈$0.4 at the smallest N and ≈$1.5×10⁻⁶ at N=200 | Baseline: ≤$2.9×10⁻¹⁵ mean at every N, confirmed by an identical rerun. High-utilization control: $0.1221 at N=5, $0.00373 at N=10, numerical zero from N=15 | **Partially aligned** — same direction, faster floor; quantitative rate unresolved | 21 s formal + 11 s telemetry + 8 s confirmation + 16 s control |
 | Revenue adequacy | Coordinator payment balance is nonnegative | Minimum margin −$2.84×10⁻¹⁴ | **Aligned under this setup** — within $10⁻¹⁰ tolerance | Included above |
 | Individual rationality | Every member is no worse off than under stand-alone NEM | Minimum saving −$1.42×10⁻¹⁴ baseline; $0 in control | **Aligned under this setup** — within tolerance | Included above |
 | LLF and MPC gaps persist | LLF near $10⁻² and MPC near $10⁻¹ at large N | Not measured | **Not attempted** | — |
 | Figure 5 savings ranges | 33.74%–67.58% private solar; 0.38%–3.83% shared solar | Not measured | **Not attempted** | — |
 
-The three successful SSH runs consumed **48 seconds of remote wall time** in total. They executed on `root@ssh3.vast.ai:15694`, verified as a host with two RTX 3090 GPUs. The workload is CPU-bound sparse optimization, so GPU utilization is not a meaningful cost measure; forcing GPU work would not add evidence.
+The four successful SSH runs consumed **56 seconds of remote wall time** in total. They executed on `root@ssh3.vast.ai:15694`, verified as a host with two RTX 3090 GPUs. The latest confirmation used the caller-specified `StrictHostKeyChecking=accept-new` and `UserKnownHostsFile=/dev/null` options through the tracked OpenResearch SSH alias. The workload is CPU-bound sparse optimization, so GPU utilization is not a meaningful cost measure; forcing GPU work would not add evidence.
 
 ## Substitutions and limits
 
