@@ -1,113 +1,149 @@
-# When Does Simple Pricing Match a Perfect-Information Scheduler?
+# TPR 分布式调度论文复现：统一判定报告
 
-![Observed TPR–oracle gap compared with approximate visual reads from the paper](images/headline-gap-comparison.png)
+![论文 Figure 4 与本次运行结果的比较](images/headline-gap-comparison.png)
 
-The central question in [arXiv:2607.15570](https://www.alphaxiv.org/abs/2607.15570) is whether a coordinator can schedule flexible household demand with a simple broadcast price while retaining the performance of a centralized scheduler. The paper's Figure 4 reports that the per-household cost gap between its Threshold Pricing Rule (TPR) and a perfect-information oracle decays approximately exponentially as the community grows.
+**最终等级：C — 部分复现成功。结论可信度：中。**
 
-**Assessment: partially aligned.** In the paper-faithful disclosed-parameter setup with synthetic EV demand, TPR and the oracle were already equal to numerical precision for every tested size. A deliberately harder high-utilization control produced a measurable gap of **$0.1221 ± $0.0335 per household at N=5**, **$0.00373 ± $0.00373 at N=10**, and numerical zero from **N=15** onward. The direction and rapid decay align with Figure 4, but the observed decay is faster and cannot establish the paper's quantitative rate because ACN demand preprocessing and plotted values were unavailable.
+本次确实在用户指定的 `root@ssh3.vast.ai:15694` 上执行了提交后的实验代码，并由运行日志产生结果；但“代码运行成功”不等于“论文完整复现成功”。[论文 2607.15570](https://www.alphaxiv.org/abs/2607.15570) 的 Figure 4 方向在一个合成高负载控制中得到部分支持，但数值与论文相差远超 10%，指数衰减率无法验证，LLF/MPC 和 Figure 5 也没有运行。因此不能判为 A 或 B。
 
-## The claim and the scheduling idea
+## 1. 本次实际复现了什么？
 
-Each household has renewable generation and deadline-constrained EV demand. The coordinator sees only aggregate conditions and broadcasts one of three price signals:
+实际运行的是一个独立实现的 Figure 4 子问题：比较在线 Threshold Pricing Rule（TPR）与知道全部未来随机量的开环 Oracle 线性规划，并计算
 
-```text
-aggregate renewable below mandatory charging  → import price π+ → charge only what deadlines require
-aggregate renewable above charging capacity   → export price π− → charge as much as possible
-aggregate renewable between the thresholds    → NEM price       → absorb renewable locally
-```
+$$
+\frac{\mathrm{cost}_{\mathrm{TPR}}-\mathrm{cost}_{\mathrm{Oracle}}}{N}.
+$$
 
-The first two zones have closed-form actions. Only the middle, net-zero zone can separate the online TPR schedule from a scheduler that knows the future. As the number of independent households grows, aggregate uncertainty concentrates and this difficult zone should become less consequential.
+每个随机实例均由本次代码现场生成，TPR 和 Oracle 均在本次运行中求解；报告中的复现数值来自远程运行生成的 CSV 和日志，而不是从论文或 README 复制，也不是把论文公式直接代入得到。
 
-The paper's empirical evidence contains three main groups of claims:
-
-| Paper evidence | Reported result | Reproduction scope |
-|---|---:|---|
-| Figure 4, TPR vs oracle | TPR gap falls from roughly $0.4/household at the smallest plotted community to about $1.5×10⁻⁶ at N=200 (visual read); approximately exponential decay | Tested with disclosed parameters and synthetic EV-demand substitutions |
-| Figure 4, LLF and MPC | Gaps plateau near $10⁻² and $10⁻¹, respectively, as N grows | Not attempted; policy details needed for a faithful implementation |
-| Figure 5, individual savings | TPR improves savings over NEM-exp by 33.74%–67.58% with private solar and 0.38%–3.83% with shared solar | Not attempted; requires Pecan Street profiles, household shares, and preprocessing |
-
-## What was implemented
-
-The experiment uses a 24-hour horizon with 96 fifteen-minute intervals, a 7.2 kW charger, a six-hour maximum charging window, a truncated-Gaussian duration centered at five hours, i.i.d. lognormal renewable generation with mean 1.6 kWh, and NEM prices of $0.50/kWh for imports and $0.20/kWh for exports. These are the parameters disclosed around Figure 4.
-
-For every seed and community size, one generated instance follows two code paths:
+实际完成了四次可追溯 SSH 运行：一个正式合成基线、两次相同提交的全遥测重复，以及一个高负载敏感性控制。使用的核心代码路径是：
 
 ```text
-seeded arrivals + EV jobs + renewables
+随机生成 EV 到达、能量需求和可再生能源
                  │
         ┌────────┴────────┐
         │                 │
-  online TPR schedule   sparse perfect-information LP
-  three price zones     all jobs and renewables known
+  在线三阈值 TPR       完美未来信息 Oracle LP
         │                 │
         └────────┬────────┘
                  │
-      (TPR cost − oracle cost) / N
+      计算每户成本差、协调者余额和住户节省
 ```
 
-The oracle is a sparse linear program whose charging variables are bounded by charger capacity and whose equality constraints enforce every EV's energy demand and each interval's energy balance. The TPR path updates each job's mandatory minimum and feasible maximum charge, then chooses the paper's three-zone action. The experiment also runs each household under stand-alone NEM to check individual savings, and compares household payments with the utility bill to check coordinator revenue adequacy.
-
-The published code is intentionally small: the formal implementation is on the [seeded synthetic scaling branch](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/seeded-synthetic-scaling-evaluation), full per-size telemetry is on the [telemetry repeat branch](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/baseline-full-telemetry-repeat), and the demand sensitivity is on the [high-utilization control branch](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/high-utilization-finite-gap-control).
-
-## The difficult zone disappears quickly
-
-![Fraction of intervals in the net-zero pricing zone](images/mechanism-zero-zone.png)
-
-In the baseline substitution, the net-zero zone occupied 4.56% of intervals at N=4, 0.78% at N=8, and none from N=16 onward. In the higher-utilization control, it fell from 6.45% at N=5 to 1.17% at N=10 and was effectively absent beyond the smallest communities. This diagnostic explains both the paper's expected convergence and why this reproduction hit the numerical floor earlier: the only zone capable of creating a visible online-versus-oracle separation became rare very quickly.
-
-This is mechanism evidence, not an independent proof of the asymptotic theorem. The simulation horizon is finite, the household model is homogeneous, and the result depends on the synthetic demand distribution.
-
-## Finite-size behavior varies across seeds
-
-![Distribution of per-household gaps across seeds at N=5 and N=10](images/robustness-seed-distribution.png)
-
-The high-utilization means do not describe every instance. At N=5, several seeds had exactly zero gap while the largest observed replicate reached $0.4258 per household; the mean was $0.1221 with a standard error of $0.0335. At N=10, fifteen of sixteen seeds were at numerical zero and one retained a visible gap, producing a mean and standard error both equal to $0.00373. This mixture of exact-zero and positive-gap instances is why the control supports rapid qualitative convergence but not a stable fitted exponential rate over many sizes.
-
-## Revenue adequacy and individual rationality remain feasible
-
-![Worst apparent feasibility violations normalized by numerical tolerance](images/diagnostic-guarantees.png)
-
-Across 336 total seeded instances, the worst coordinator margin was −$2.84×10⁻¹⁴ and the worst household saving relative to stand-alone NEM was −$1.42×10⁻¹⁴. Both are floating-point residuals more than three orders of magnitude inside the prespecified $10⁻¹⁰ numerical tolerance. Under these setups, the observed evidence is aligned with the paper's revenue-adequacy and individual-rationality guarantees.
-
-These diagnostics check realized simulated trajectories. They do not replace the paper's analytical guarantees over the full model class.
-
-## Claim-by-claim assessment
-
-| Claim | Paper result | Observed result | Assessment | Compute |
-|---|---|---|---|---:|
-| Figure 4: TPR approaches the oracle as N grows | Approximately exponential; visually ≈$0.4 at the smallest N and ≈$1.5×10⁻⁶ at N=200 | Baseline: ≤$2.9×10⁻¹⁵ mean at every N, confirmed by an identical rerun. High-utilization control: $0.1221 at N=5, $0.00373 at N=10, numerical zero from N=15 | **Partially aligned** — same direction, faster floor; quantitative rate unresolved | 21 s formal + 11 s telemetry + 8 s confirmation + 16 s control |
-| Revenue adequacy | Coordinator payment balance is nonnegative | Minimum margin −$2.84×10⁻¹⁴ | **Aligned under this setup** — within $10⁻¹⁰ tolerance | Included above |
-| Individual rationality | Every member is no worse off than under stand-alone NEM | Minimum saving −$1.42×10⁻¹⁴ baseline; $0 in control | **Aligned under this setup** — within tolerance | Included above |
-| LLF and MPC gaps persist | LLF near $10⁻² and MPC near $10⁻¹ at large N | Not measured | **Not attempted** | — |
-| Figure 5 savings ranges | 33.74%–67.58% private solar; 0.38%–3.83% shared solar | Not measured | **Not attempted** | — |
-
-The four successful SSH runs consumed **56 seconds of remote wall time** in total. They executed on `root@ssh3.vast.ai:15694`, verified as a host with two RTX 3090 GPUs. The latest confirmation used the caller-specified `StrictHostKeyChecking=accept-new` and `UserKnownHostsFile=/dev/null` options through the tracked OpenResearch SSH alias. The workload is CPU-bound sparse optimization, so GPU utilization is not a meaningful cost measure; forcing GPU work would not add evidence.
-
-## Substitutions and limits
-
-The decisive substitution is EV demand. The paper names ACN-Data but does not publish its preprocessing, random seeds, truncated-Gaussian standard deviation, or Figure 4 point values. The baseline therefore samples each job at 35%–85% of its feasible charging envelope; the sensitivity control uses 85%–100%. Both use 16 deterministic seeds per community size. The paper reference points in the headline chart are approximate visual reads and are deliberately shown as unconnected markers.
-
-The reproduced TPR uses the disclosed threshold structure, but it is a compact independent implementation rather than the authors' code. A full-scale reproduction would still need:
-
-- the exact ACN session filtering and conversion from sessions to EV energy/deadline pairs;
-- the authors' random seeds and all Figure 4 community sizes or raw plotted values;
-- faithful LLF and MPC definitions, including forecast construction and MPC horizon;
-- Pecan Street solar preprocessing and shared-solar allocations for Figure 5;
-- additional seeds around N=5–15, where the finite-size gap is a zero-inflated random variable.
-
-## Reproduce or explore the evidence
-
-The fixed formal command for every experiment node is:
+正式运行命令固定为：
 
 ```bash
 python3 -m pip install --disable-pip-version-check -r requirements.txt && python3 reproduce.py
 ```
 
-The self-contained [marimo tutorial](../../notebooks/tpr_figure4_tutorial.py) embeds the observed summary values and redraws the central evidence without rerunning the remote optimization. Because the repository is private, run it locally with:
+## 2. 哪些内容没有复现？
 
-```bash
-uvx marimo edit notebooks/tpr_figure4_tutorial.py
-uvx marimo run notebooks/tpr_figure4_tutorial.py
-```
+- 没有使用论文的 Caltech ACN-Data EV 需求；论文未给出筛选、清洗和从会话到能量/截止期变量的完整转换方法。
+- 没有实现 Figure 4 的 least-laxity-first（LLF）和 model predictive control（MPC），因此没有验证“TPR 优于 LLF/MPC，且后两者差距不消失”。
+- 没有复现 Figure 5 的 NEM-exp、Pecan Street 私有屋顶光伏和共享社区光伏，也没有验证论文报告的 33.74%–67.58% 与 0.38%–3.83% 节省区间。
+- 没有复现作者的随机种子、样本数量、软件版本、线程配置或原始 Figure 4 数据点；论文没有公开这些信息。
+- 没有验证论文的完整理论证明。收入充足性和个体理性只在有限的合成轨迹上做了数值检查。
 
-The exact plotted inputs are preserved in [`data/`](data/), and the four figures can be regenerated with `uv run --with matplotlib --with numpy python reports/tpr-figure4/make_figures.py`.
+## 3. 每个核心结论是否得到支持？
+
+| 核心结论 | 论文结论 | 本次运行证据 | 方向 | 数值 | 判定 |
+|---|---|---|---|---|---|
+| TPR–Oracle 差距随社区规模下降 | Figure 4 呈近似指数下降 | 高负载控制从 N=5 的 $0.1221 降至 N=10 的 $0.00373，N≥15 为数值零 | **一致** | **不接近** | 部分支持 |
+| 下降近似指数规律 | 多个规模点在对数坐标近似直线 | 只有 N=5、10 两个非零均值，其余点落在浮点噪声层 | 无足够点判断 | 不接近 | **未验证** |
+| TPR 优于 LLF 和 MPC | TPR 趋零，LLF/MPC 保持非零差距 | LLF/MPC 未运行 | 无法判断 | 无法比较 | **未复现** |
+| 收入充足性 | 协调者每时段余额非负 | 最小余额 −$2.84×10⁻¹⁴，在 $10⁻¹⁰ 容差内 | 一致 | 论文未给经验数值 | 合成条件下支持 |
+| 个体理性 | 每个成员不劣于独立 NEM | 最小住户节省 −$1.42×10⁻¹⁴，在容差内 | 一致 | 论文未给对应轨迹数值 | 合成条件下支持 |
+| Figure 5 中 TPR 优于 NEM-exp | 私有光伏提升 33.74%–67.58%；共享光伏提升 0.38%–3.83% | NEM-exp 和 Pecan Street 数据均未运行 | 无法判断 | 无法比较 | **未复现** |
+
+收入充足性和个体理性的有限样本结果如下。它们是有效的运行证据，但不能替代理论命题对全部模型实例的保证。
+
+![收入充足性与个体理性数值诊断](images/diagnostic-guarantees.png)
+
+## 4. 论文结果与复现结果相差多少？
+
+论文未给出 Figure 4 原始数值、方差或置信区间。以下论文数值是从图中读取的近似值，因此采用用户指定的“相对差异 10%”作为临时参考，而不是把近似读数当成精确 ground truth。
+
+| 社区规模 | 论文 Figure 4 TPR（视觉近似） | 本次高负载控制均值 ± SEM | 近似相对差异 | 10% 标准 |
+|---:|---:|---:|---:|---|
+| 5 | $0.40 | $0.1221 ± $0.0335 | 69.5% | 不满足 |
+| 10 | $0.20 | $0.00373 ± $0.00373 | 98.1% | 不满足 |
+| 200 | $1.5×10⁻⁶ | $2.27×10⁻¹⁵（数值噪声） | 约 100% | 不满足 |
+
+从 N=5 到 N=10，论文曲线视觉上约下降 50%，本次控制下降约 96.9%。因此只能说“下降方向一致”，不能说“数值或衰减规律复现”。基线合成需求在所有规模上直接达到数值零，也不能用于估计论文报告的指数斜率。
+
+种子间分布显示本次有限规模结果高度零膨胀：N=5 时部分种子为零、最大单次差距为 $0.4258；N=10 时 16 个种子中只有一个保留明显非零差距。
+
+![N=5 与 N=10 的种子间差异](images/robustness-seed-distribution.png)
+
+## 5. 实验条件是否一致？
+
+| 条件 | 论文 | 本次复现 | 一致性及可能影响 |
+|---|---|---|---|
+| EV 数据 | Caltech ACN-Data | 合成截断持续时间与能量利用率 | **不一致；最关键差异。** 直接改变负荷强度、截止期压力和 TPR 进入困难区间的概率 |
+| 可再生能源 | i.i.d. 对数正态，均值 1.6 kWh | 同分布族和均值，σ=0.7 | 部分一致；论文未公开 σ，方差不同会改变聚合集中速度 |
+| 时间范围 | 24 h，15 min 间隔 | 24 h，96×15 min | 一致 |
+| 充电器 | 7.2 kW | 7.2 kW | 一致 |
+| 充电窗口 | 截断高斯均值 5 h，最大 6 h | 均值 5 h、最大 6 h、标准差 1 h | 部分一致；论文未公开标准差 |
+| 到达率 | α=1.6/(最大充电功率×6 h) | 使用相同边界到达率 | 一致 |
+| NEM 费率 | $0.50/$0.20 per kWh | $0.50/$0.20 per kWh | 一致 |
+| 社区规模 | Figure 4 约 N=5…200 | 控制采用图示网格；基线为 N=4…256 | 控制大致一致，基线不同 |
+| 对比算法 | TPR、Oracle、LLF、MPC | TPR、Oracle；另做独立 NEM 诊断 | **不完整；无法验证相对 LLF/MPC 的核心比较** |
+| 随机重复 | 未公开 | 每个 N 16 个确定性种子 | 无法判断统计等价性 |
+| 实现 | 作者实现未公开 | 独立 Python/Scipy 实现 | 可能存在调度细节、边界处理或目标函数差异 |
+| 软件版本 | 未公开 | Python 3.12.3、NumPy 2.2.6、SciPy 1.15.3、Matplotlib 3.10.3 | 无法匹配，但对主要差异的影响预计小于数据与算法缺失 |
+| 硬件/线程 | 未公开 | 用户 SSH 主机，2×RTX 3090；LP 实际为 CPU 工作负载，线程数未固定 | 无法匹配；主要影响耗时，通常不应造成数量级指标差异 |
+
+困难的净零定价区间在本次合成数据中消失得过快：基线从 N=4 的 4.56% 降至 N=16 的 0；高负载控制从 N=5 的 6.45% 降至 N=10 的 1.17%，随后接近零。这很可能解释了复现曲线比论文快得多地触底。
+
+![净零定价区间随规模的变化](images/mechanism-zero-zone.png)
+
+## 6. 实验真实性检查
+
+真实性检查通过：
+
+- 结果来自本次远程运行生成的逐实例 CSV；正式基线包含 112 个实例，高负载控制包含 224 个实例。
+- 两次相同提交的全遥测运行得到完全一致的随机结果，只存在毫秒级运行时间差异。
+- 高负载控制的 224 个实例中有 12 个差距大于 $10⁻¹⁰，最大差距为 $0.4258；这些数值来自实际 LP 与 TPR 调度结果，不是从论文抄录。
+- 图中的橙色论文点与蓝色复现点明确分离；橙色点仅用于近似比较，不参与生成复现指标。
+
+## 7. 差异可能来自哪里？
+
+按影响可能性排序：
+
+1. **ACN-Data 被合成 EV 能量替换。** 这是最可能导致复现过早达到零差距的原因。
+2. **论文未公开对数正态 σ 和截断高斯标准差。** 聚合波动和截止期压力对指数收敛曲线非常敏感。
+3. **独立实现而非作者代码。** 零区间价格响应、多个任务的边界处理和 Oracle 约束可能与作者实现不同。
+4. **缺少 LLF/MPC。** 无法确认 TPR 的相对优势是否来自算法本身或当前实例过于容易。
+5. **种子和样本量不同。** N=5、10 的零膨胀分布表明均值对种子非常敏感。
+6. **线程和数值求解器配置未对齐。** 可能影响最后几位和耗时，但不足以解释 69%–100% 的差异。
+
+## 8. 最终等级、结论与可信度
+
+- **最终等级：C — 部分复现成功。**
+- **最终结论：部分成功，不是完整复现成功，也不是缩小规模复现成功。**
+- **结论可信度：中。**
+
+选择 C 的原因是：代码和多个真实实验均完成；TPR–Oracle 差距下降的方向以及收入充足性、个体理性的有限样本诊断得到支持。但 Figure 4 数值远超 10% 差异阈值，指数规律没有足够非零点验证，两类重要基线和 Figure 5 完全未复现，且关键数据集不一致。
+
+没有判为 D，是因为本次存在有效的 Oracle ground truth、随机重复和真实的参数趋势比较，能对部分论文结论作出实验判断。没有判为 E，是因为未观察到与论文主要方向明确相反的结果；问题是条件不一致、数值偏离和覆盖不完整，而不是运行无效。
+
+## 9. 下一步怎样提高复现等级？
+
+要从 C 提升到 B 或 A，优先级如下：
+
+1. 获取作者的 ACN 会话筛选、能量/截止期构造、对数正态 σ、截断高斯标准差、随机种子和 Figure 4 原始数据。
+2. 在完全相同的 N 网格上至少运行 30–50 个种子，报告均值、标准差/置信区间，并重点加密 N=5–30。
+3. 实现并验证论文定义的 LLF 和 MPC，包括 MPC 预测数据、滚动窗口和终端约束；比较相同实例上的三种方法。
+4. 用相同数据逐点检查 TPR 与 Oracle 的目标函数、约束和边界条件，最好与作者代码或少量作者输出进行单元级对照。
+5. 获取 Pecan Street 数据处理和共享光伏份额，运行 NEM-exp，复现 Figure 5 的每成员节省范围。
+6. 固定并记录 CPU 型号、线程数、BLAS/HiGHS 配置和全部软件版本；硬件主要用于可重复耗时，不应替代结果一致性判断。
+
+若完整数据仍不可得，最高合理目标是 B：在明确标注的缩小/替代条件下，同时复现 TPR、LLF、MPC 的排序关系和随 N 变化趋势，并让可比较指标落入论文误差区间或暂定 10% 范围。
+
+## 代码、数据与实验分支
+
+- [正式合成基线](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/seeded-synthetic-scaling-evaluation)
+- [全遥测重复](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/baseline-full-telemetry-repeat)
+- [高负载控制](https://github.com/S-Discipline/price-based-distributed-scheduling-of-flexible-d/tree/orx/high-utilization-finite-gap-control)
+- [自包含 marimo 教程](../../notebooks/tpr_figure4_tutorial.py)
+- 逐实例数据保存在 [`data/`](data/)，图表由 `make_figures.py` 从这些实际运行数据重建。

@@ -17,12 +17,14 @@ def _(mo):
     mo.md(r"""
     # TPR approaches a perfect-information scheduler as the community grows
 
-    **Reproduction result.** A high-utilization sensitivity control measured a
+    **Unified verdict: C — partial reproduction success, medium confidence.** A high-utilization sensitivity control measured a
     TPR–oracle gap of **$0.1221 ± $0.0335 per household at $N=5$**, **$0.00373 ±
     $0.00373 at $N=10$**, and numerical zero from **$N=15$**. This is
-    qualitatively aligned with Figure 4 of
-    [arXiv:2607.15570](https://www.alphaxiv.org/abs/2607.15570), although the
-    decay is faster under the synthetic EV-demand substitution.
+    decreasing direction consistent with Figure 4 of
+    [arXiv:2607.15570](https://www.alphaxiv.org/abs/2607.15570). However, approximate
+    relative differences from the paper are 69.5% at $N=5$, 98.1% at $N=10$,
+    and nearly 100% at $N=200$, outside the provisional 10% criterion. Only two
+    sizes have nonzero means, so the reported exponential rate is not verified.
 
     This notebook embeds the completed-run summaries. It does **not** rerun the
     remote optimization.
@@ -145,10 +147,10 @@ def _(mo):
 
     | Claim | Assessment | Evidence |
     |---|---|---|
-    | TPR gap shrinks rapidly with community size | **Partially aligned** | Measurable at $N=5$ and $10$; numerical zero from $N=15$ |
+    | TPR gap decreases with community size | **Direction supported only** | Measurable at $N=5$ and $10$; numerical zero from $N=15$ |
     | Revenue adequacy | **Aligned under this setup** | Worst margin $-2.84\times10^{-14}$, within $10^{-10}$ tolerance |
     | Individual rationality | **Aligned under this setup** | Worst saving $-1.42\times10^{-14}$, within tolerance |
-    | Paper's exact exponential rate | **Inconclusive under this setup** | ACN preprocessing and raw Figure 4 values are unavailable |
+    | Paper's magnitudes and exponential rate | **Not verified** | Values differ by far more than 10%; ACN preprocessing and raw Figure 4 values are unavailable |
 
     The formal runs used a 24-hour, 15-minute horizon, 7.2 kW chargers, a
     six-hour maximum charging window, lognormal renewable generation with mean

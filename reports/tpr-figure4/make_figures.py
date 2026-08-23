@@ -66,7 +66,7 @@ def headline(baseline: list[dict[str, float]], stress: list[dict[str, float]]) -
     ax.set_ylim(4e-15, 1.2)
     ax.legend(frameon=False, fontsize=8.5, loc="upper right")
     style_axis(ax)
-    fig.suptitle("Observed decay is qualitatively aligned and faster than the paper",
+    fig.suptitle("Direction agrees; magnitudes are not within the 10% reference band",
                  x=0.12, ha="left", fontsize=11, color=INK, y=0.995)
     finish(fig, "headline-gap-comparison.png")
 
