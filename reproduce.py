@@ -11,14 +11,34 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.optimize import linprog
-from scipy.sparse import coo_matrix
+
+def _ensure_dependencies():
+    """Install pinned wheels only when the execution image lacks them."""
+    try:
+        import matplotlib  # noqa: F401
+        import numpy  # noqa: F401
+        import scipy  # noqa: F401
+    except ModuleNotFoundError:
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", "--break-system-packages",
+            "numpy==2.2.6", "scipy==1.15.3", "matplotlib==3.10.3",
+        ])
+        os.execv(sys.executable, [sys.executable, *sys.argv])
+
+
+_ensure_dependencies()
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from scipy.optimize import linprog  # noqa: E402
+from scipy.sparse import coo_matrix  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parent
